@@ -4,39 +4,35 @@ import scrapy
 
 class SummonerSpider(scrapy.Spider):
     name = 'summoner'
-    allowed_domains = ['http://lan.op.gg/summoner/userName=oca159']
-    start_urls = ['http://lan.op.gg/summoner/userName=oca159']
+    regions = ["lan", "las", "br", "euw", "na"]
+
+    def start_requests(self):
+        username = getattr(self, 'username', 'oca159')
+        region = getattr(self, 'region', None)
+        url = f'http://op.gg/summoner/userName={username}'
+        if region is not None and region in self.regions:
+            url = f'http://{region}.op.gg/summoner/userName={username}'
+        yield scrapy.Request(url)
 
     def parse(self, response):
-        def extract_first_with_css(query, context=response):
-            return context.css(query).extract_first().strip()
-
-        def extract_all_with_css(query, context=response):
-            return context.css(query).extract()
-
-        def re_first_with_css(query, regex, context=response):
-            return context.css(query).re_first(regex).strip()
-
-        def re_all_with_css(query, regex, context=response):
-            return context.css(query).re(regex)
 
         def get_most_played_champions():
             champion_box = response.css(".ChampionBox.Ranked")
             most_played_champions = []
             for champion in champion_box:
                 most_played_champions.append({
-                    "name": extract_first_with_css(".ChampionName::attr(title)", champion),
-                    "winratio": extract_first_with_css(".WinRatio::text", champion),
-                    "kda": extract_first_with_css("span.KDA::text", champion),
+                    "name": champion.css(".ChampionName::attr(title)").extract_first(default="Not found").strip(),
+                    "winratio": champion.css(".WinRatio::text").extract_first(default="Not found").strip(),
+                    "kda": champion.css("span.KDA::text").extract_first(default="Not found").strip(),
                 })
             return most_played_champions
 
         yield {
-            "name": extract_first_with_css("span.Name::text"),
-            "elo": extract_first_with_css("span.tierRank::text"),
-            "lp": extract_first_with_css("span.LeaguePoints::text"),
-            "wins": extract_first_with_css("span.wins::text"),
-            "losses": extract_first_with_css("span.losses::text"),
-            "winratio": re_first_with_css("span.winratio::text", "(\d+%)"),
+            "name": response.css("span.Name::text").extract_first(default="Not found").strip(),
+            "elo": response.css("span.tierRank::text").extract_first(default="Not found").strip(),
+            "lp": response.css("span.LeaguePoints::text").extract_first(default="Not found").strip(),
+            "wins": response.css("span.wins::text").extract_first(default="Not found").strip(),
+            "losses": response.css("span.losses::text").extract_first(default="Not found").strip(),
+            "winratio": response.css("span.winratio::text").re_first("(\d+%)", default="Not found").strip(),
             "most_played_champions": get_most_played_champions(),
         }
